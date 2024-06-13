@@ -22,4 +22,6 @@ class Scraper():
   def start_scraping(self):
     for web_site in self.websites_url:
       handler = web_site(self.driver)
-      handler.handle()
+      result = handler.handle()
+      for r in result:
+        print(r)

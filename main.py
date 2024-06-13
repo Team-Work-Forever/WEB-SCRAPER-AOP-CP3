@@ -1,6 +1,8 @@
-from scraper import Scraper, webdriver
-
+from handler.buy_house_handler import BuyHouseHandler
+from handler.era_handler import EraHandler
+from handler.remax_handler import RemaxHandler
 from handler.imo_virtual_handler import ImoVirtualHandler
+from scraper import Scraper, webdriver
 
 options = webdriver.EdgeOptions()
 options.add_argument("--enable-chrome-browser-cloud-management")
@@ -12,7 +14,10 @@ options.add_experimental_option("detach", True)
 scraper = Scraper(
   "driver\msedgedriver.exe",
   [
-    ImoVirtualHandler
+    # ImoVirtualHandler
+    # EraHandler
+    # BuyHouseHandler
+    RemaxHandler
   ],
   options
 )
