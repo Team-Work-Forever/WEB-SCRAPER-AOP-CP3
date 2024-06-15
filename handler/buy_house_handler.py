@@ -6,8 +6,9 @@ from contracts.propertyResult import PropertyResult
 from contracts.urlResult import UrlResult
 from handler.handler import Handler
 
+from selenium.common.exceptions import NoSuchElementException
+
 from selenium.webdriver.common.by import By
-from selenium.webdriver import ActionChains
 
 class BuyHouseHandler(Handler):
   cookies_btn = ".//button[@id='onetrust-accept-btn-handler']"
@@ -21,8 +22,6 @@ class BuyHouseHandler(Handler):
     return f"https://www.comprarcasa.pt/imoveis?p={page}&ltype=1&orderby=0&el=32"
 
   def handle(self):
-    properties = [PropertyResult]
-
     self.driver.get(self.url(self.first_page))
 
     self.wait_and_click(By.XPATH, self.cookies_btn)
@@ -30,7 +29,6 @@ class BuyHouseHandler(Handler):
     number_pages_text_elem = self.wait_and_find(By.XPATH, self.number_pages_text).text
     number_pages_parts = number_pages_text_elem.rsplit(' ', 1)
     number_pages = int(number_pages_parts[1].strip())
-    number_pages = 2
 
     for i in range(self.first_page, number_pages):
       self.driver.get(self.url(i))
@@ -39,37 +37,52 @@ class BuyHouseHandler(Handler):
       cards = cards_collection.find_elements(By.XPATH, ".//a[@class='prop ']")
 
       for card in cards:
-        details = {}
+        try:
+          details = {}
 
-        # Url
-        card_url = card.get_attribute('href')
+          # Url
+          card_url = card.get_attribute('href')
 
-        # Location
-        card_location = card.find_element(By.XPATH, ".//h3[@class='prop_subTitle']").text
+          # Location
+          card_location = card.find_element(By.XPATH, ".//h3[@class='prop_subTitle']").text
 
-        # Price and Type of offer
-        card_type = card.find_element(By.XPATH, ".//span[@class='stamp stamp--primary']").text
-        card_price = card.find_element(By.XPATH, ".//span[@class='prop_tag']").text
-        
-        # Info house
-        card_property_type = card.find_element(By.XPATH, ".//h2[@class='prop_title']").text
-        card_property_details_collection = card.find_element(By.XPATH, ".//ul[@class='prop_details']")
-        card_property_details = card_property_details_collection.find_elements(By.XPATH, ".//li")
+          # Price and Type of offer
+          card_type = card.find_element(By.XPATH, ".//span[@class='stamp stamp--primary']").text
+          
+          card_price = ''
 
-        for detail in card_property_details:
-          detail_key_element = detail.find_element(By.XPATH, ".//i")
-          detail_key = detail_key_element.get_attribute("class")
-          detail_value = detail.text
-          details[detail_key] = detail_value
+          try:
+            haveReducedPrice = card.find_element(By.XPATH, ".//span[@class='reduzedPriceItemSymbol']").text
+            if haveReducedPrice:
+                card_price = self.wait_and_find_in_elem(card, By.XPATH, ".//span[@class='prop_tag']").text
+                card_price = card_price.split('€', 1)[1].strip()
 
-        properties.append(PropertyResult(
-          url=UrlResult(url=card_url),
-          location=LocationResult(location=card_location),
-          offer=OfferResult(price=card_price, typeOffer=card_type),
-          property_details=PropertyDetailsResult(type=card_property_type, details=details)
-        ))
+          except NoSuchElementException:
+            pass
+          
+          if not card_price:
+            card_price = self.wait_and_find_in_elem(card, By.XPATH, ".//span[@class='prop_tag']").text
 
-      i += i
+          # Info house
+          card_property_type = card.find_element(By.XPATH, ".//h2[@class='prop_title']").text
+          card_property_details_collection = card.find_element(By.XPATH, ".//ul[@class='prop_details']")
+          card_property_details = card_property_details_collection.find_elements(By.XPATH, ".//li")
 
-    ActionChains(self.driver).pause(seconds=500)
-    return properties
+          for detail in card_property_details:
+            detail_key_element = detail.find_element(By.XPATH, ".//i")
+            detail_key = detail_key_element.get_attribute("class")
+            detail_value = detail.text
+            details[detail_key] = detail_value
+
+          yield PropertyResult(
+            url=UrlResult(url=card_url),
+            location=LocationResult(location=card_location),
+            offer=OfferResult(price=card_price, typeOffer=card_type),
+            property_details=PropertyDetailsResult(type=card_property_type, details=details)
+          )
+          
+        except Exception:
+          print("Card without description!")
+          pass
+
+      i += 1
